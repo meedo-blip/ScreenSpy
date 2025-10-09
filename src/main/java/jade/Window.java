@@ -9,6 +9,7 @@ import org.lwjgl.openal.ALCapabilities;
 import org.lwjgl.opengl.*;
 import renderer.FboRenderer;
 import renderer.ScreenQuad;
+import util.Time;
 
 import java.nio.IntBuffer;
 
@@ -42,6 +43,7 @@ public class Window {
     private long audioContext;
 
     private long ticks = 0;
+    private boolean shouldClose = false;
 
     private Window() {
         bufferH = BufferUtils.createIntBuffer(1);
@@ -63,6 +65,18 @@ public class Window {
         return Window.window;
     }
 
+    public static Window get() {
+        if (Window.window == null) {
+            Window.window = new Window();
+            Window.window.title = "Jade Engine";
+        }
+        return Window.window;
+    }
+
+    public static boolean shouldClose() {
+        return window.shouldClose;
+    }
+
     public static long getTicks() {return window.ticks; }
 
     public static Scene getScene() {
@@ -70,11 +84,11 @@ public class Window {
     }
 
     public static int getWidth() {
-        return bufferW.get(0);
+        return window.window_w;
     }
 
     public static int getHeight() {
-        return bufferH.get(0);
+        return window.window_h;
     }
 
     public static FboRenderer getFbo() {
@@ -88,6 +102,9 @@ public class Window {
         changeScene(scene);
         loop();
 
+        currentScene.dispose();
+
+        System.out.println("Goodbye LWJGL!");
         // Free the memory
         glfwFreeCallbacks(glfwWindow);
         glfwDestroyWindow(glfwWindow);
@@ -99,6 +116,7 @@ public class Window {
         // Terminate glfw and free the error callback
         glfwTerminate();
         glfwSetErrorCallback(null).free();
+
     }
 
     public void init() {
@@ -165,6 +183,19 @@ public class Window {
         window_h = bufferH.get(0);
         fboRenderer = new FboRenderer(window_w, window_h);
 
+        glfwSetFramebufferSizeCallback(window.glfwWindow, (window, width, height) -> {
+             this.window_w = width;
+             this.window_h = height;
+             getScene().camera().onWindowResize(width, height);
+             glViewport(0, 0, width, height);
+
+             glMatrixMode(GL_PROJECTION);
+             glLoadIdentity();
+             glOrtho(0, width, height, 0, 1f, -1f);
+             glMatrixMode(GL_MODELVIEW);
+             glLoadIdentity();
+        });
+
         System.out.println("Your Gpu supports upto " + texture_units[0] + " textures per batch.");
     }
 
@@ -181,6 +212,8 @@ public class Window {
         while (!glfwWindowShouldClose(glfwWindow)) {
             // Poll events
             glfwPollEvents();
+
+            //System.out.println("running window");
 
             fboRenderer.bind();
 
@@ -207,6 +240,7 @@ public class Window {
             dt = endTime - startTime;
             startTime = endTime;
 
+            Time.totalTime += dt;
             if(currentScene.fixedDT > dt) {
                 try {
                     Thread.sleep((long) ((currentScene.fixedDT - dt) * 1000));

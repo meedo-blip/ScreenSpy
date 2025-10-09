@@ -68,7 +68,7 @@ public abstract class Scene {
         return spr;
     }
 
-    public Sprite makeText(MyFont font, String text, float x, float y, int fontsize, Vector4f color) {
+    public TextNode makeText(MyFont font, String text, float x, float y, int fontsize, Vector4f color) {
         return makeText(font, text, x, y, fontsize, color, null);
 
     }
@@ -118,6 +118,8 @@ public abstract class Scene {
         }
         ticks++;
     }
+
+    public void dispose() {}
 
     public int getTicks() { return ticks; }
 
@@ -187,6 +189,8 @@ public abstract class Scene {
 
                 removeSprite(getSpriteById(gameParents.remove(loc)));
             }
+        } else {
+            System.out.println("Sprite " + parent.name + " has no children!");
         }
     }
 

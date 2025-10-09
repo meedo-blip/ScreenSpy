@@ -56,4 +56,7 @@ public class Camera {
 	}
 
 
+	public void onWindowResize(int width, int height) {
+		
+	}
 }

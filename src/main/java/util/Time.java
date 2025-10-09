@@ -4,6 +4,7 @@ public class Time {
     private static Thread timer;
 
     public static float dt;
+    public static double totalTime = 0;
 
     @Deprecated
     // please be careful with what your runnable does

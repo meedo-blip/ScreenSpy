@@ -4,10 +4,14 @@ import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.net.Inet4Address;
+import java.net.InetAddress;
+import java.net.NetworkInterface;
 import java.net.Socket;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Enumeration;
 import java.util.List;
 
 public class SendApp {
@@ -113,9 +117,11 @@ public class SendApp {
         }
         return bytes;
     }
+
     public static void main(String[] args) {
         try {
-            SendClient client = new SendClient("192.168.8.190", 5000);
+
+            SendClient client = new SendClient(  5000);
 
             Robot robot = new Robot();
             Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
@@ -125,6 +131,11 @@ public class SendApp {
             int targetHeight = 720;
 
             while (true) {
+
+                if (client.isClosed()) {
+                    client = new SendClient(5000);
+                }
+
                 // Capture desktop
                 BufferedImage screenshot = robot.createScreenCapture(screenRect);
 
@@ -146,7 +157,7 @@ public class SendApp {
                 client.sendFrame(frameBytes);
 
                 // ~30 FPS
-                Thread.sleep(10);
+                Thread.sleep(100);
             }
         } catch (Exception e) {
             e.printStackTrace();
@@ -166,6 +177,13 @@ class SendClient {
         System.out.println("Connected to server as sender");
     }
 
+    public SendClient(int port) throws IOException {
+        socket = new Socket(getIpAddress(), port);
+        out = new DataOutputStream(socket.getOutputStream());
+        System.out.println("Connected to server as sender");
+    }
+
+
     public void sendFrame(byte[] frameData) throws IOException {
         // Safety check: limit frame rate
         long now = System.currentTimeMillis();
@@ -180,10 +198,40 @@ class SendClient {
         out.flush();
     }
 
+    public static String getIpAddress() {
+        try {
+            Enumeration<NetworkInterface> nets = NetworkInterface.getNetworkInterfaces();
+            while (nets.hasMoreElements()) {
+                NetworkInterface netint = nets.nextElement();
+                // Skip loopback and down interfaces
+                if (netint.isLoopback() || !netint.isUp()) continue;
+
+                Enumeration<InetAddress> addresses = netint.getInetAddresses();
+                while (addresses.hasMoreElements()) {
+                    InetAddress addr = addresses.nextElement();
+                    if (addr instanceof Inet4Address && addr.isSiteLocalAddress()) {
+                        System.out.println("LAN IP: " + addr.getHostAddress());
+                        return addr.getHostAddress();
+                    }
+                }
+            }
+            System.out.println("No LAN IP found");
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        System.out.println("Defaulting to localhost");
+        return "localhost";
+    }
+
     private long lastSendTime = 0;
 
     public void close() throws IOException {
         socket.close();
+    }
+
+    public boolean isClosed() {
+        return socket.isClosed();
     }
 }
 

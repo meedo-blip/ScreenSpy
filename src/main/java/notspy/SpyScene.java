@@ -1,24 +1,28 @@
 package notspy;
 
 import components.StaticBlock;
+import components.TextNode;
 import jade.Scene;
 import jade.Transform;
+import jade.Window;
 import org.joml.Vector2f;
+import org.joml.Vector4f;
 import util.Utils;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
+import static jade.Constants.ARIAL_FONT;
 import static jade.Constants.DEFAULT_SH;
 
 public class SpyScene extends Scene {
 
-    private RecieverClient client;
+    private RecieverServer server;
 
     private StaticBlock block;
+    private TextNode infoText;
     private static int blockWidth = 1280;  // scaled resolution
     private static int blockHeight = blockWidth * 9 / 16;
 
@@ -80,16 +84,21 @@ public class SpyScene extends Scene {
         addSpriteObjectToScene(block);
 
 
-        // Connect RecieveClient to server in a separate thread
-        new Thread(() -> {
-            try {
-                client = new RecieverClient("192.168.8.190", 5000, receivedQueue);
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        }, "RecieveClient-Thread").start();
+        try {
+            server = new RecieverServer(5000, receivedQueue);
+            server.start();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+
+        infoText = makeText(ARIAL_FONT, "Waiting for connection...", 0, 0, 24, new Vector4f(0.5f,0.5f,1,1));
     }
 
+    @Override
+    public void dispose() {
+        server.thread.interrupt();
+    }
     @Override
     public void update(float dt) {
         super.update(dt);
@@ -97,6 +106,12 @@ public class SpyScene extends Scene {
         // Consume queued data safely on render thread
         byte[] data = receivedQueue.poll();
         receivedQueue.clear();
+
+        if(server.isClientConnected()) infoText.setText("");
+        else {
+            infoText.setText("Waiting for connection...");
+            block.texId = -1;
+        }
 
         if (data == null) {
             return; // No new frame
@@ -108,13 +123,12 @@ public class SpyScene extends Scene {
         buffer.put(data);
         buffer.flip();
 
-        if (textureId == -1) {
+        if (block.texId == -1) {
             // Create texture once
-            textureId = Utils.generateTexture(buffer, blockWidth, blockHeight, 3);
-            block.texId = textureId;
+            block.texId = Utils.generateTexture(buffer, blockWidth, blockHeight, 3);
         } else {
             // Update existing texture
-            Utils.updateTexture(textureId, buffer, blockWidth, blockHeight, 3);
+            Utils.updateTexture(block.texId, buffer, blockWidth, blockHeight, 3);
         }
     }
 }

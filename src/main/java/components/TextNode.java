@@ -7,8 +7,6 @@ import jade.Window;
 import org.joml.Vector2f;
 import org.joml.Vector4f;
 
-import java.util.Objects;
-
 public abstract class TextNode extends QuadSprite {
 
     protected String text;
@@ -22,6 +20,7 @@ public abstract class TextNode extends QuadSprite {
         this.font = font;
         this.fontsize = fontsize;
         textColor = color;
+        this.shader = Constants.DEFAULT_SH;
         color = Constants.INVISIBLE;
     }
 
@@ -33,7 +32,7 @@ public abstract class TextNode extends QuadSprite {
         float halfW = (float) text.length() / 2;
 
         for (int i = startIndex; i < text.length(); i++) {
-            Window.getScene().addSpriteObjectToScene(
+            Window.getScene().addSprite(
                     new FontSprite(font.texId, font.getCharTexCoords(text.charAt(i)), textColor)
                             .setTransform(new Transform(new Vector2f(((i % width) - halfW) * fontsize, (i / width) * fontsize), -1, new Vector2f(fontsize, fontsize)))
                             .setName("" + text.charAt(i)), this);
@@ -50,7 +49,9 @@ public abstract class TextNode extends QuadSprite {
     @Override
     public void start() {
         super.start();
+        transform.scale.x = 0;
+        transform.scale.y = 0;
         makeFontSprites(0);
-        changed = false;
+        changed = true;
     }
 }

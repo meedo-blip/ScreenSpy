@@ -60,7 +60,7 @@ public class SendApp {
 
     public static byte[] compress_RGB(byte[] rgb) {
         if (rgb.length % 3 != 0) {
-            throw new IllegalArgumentException("Input length must be multiple of 4 (RGBA pixels)");
+            throw new IllegalArgumentException("Input length must be multiple of 3 (RGB pixels)");
         }
 
         List<Byte> out = new ArrayList<>();
@@ -123,6 +123,8 @@ public class SendApp {
 
             SendClient client = new SendClient(  5000);
 
+            long dt, start = 0, end = 0;
+
             Robot robot = new Robot();
             Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
             Rectangle screenRect = new Rectangle(screenSize);
@@ -130,7 +132,12 @@ public class SendApp {
             int targetWidth = 1280;  // downscale to save bandwidth
             int targetHeight = 720;
 
+            int[] ints = new int[targetWidth * targetHeight];
+            byte[] frameBytes = new byte[ints.length * 3];
+
             while (true) {
+
+                start = System.currentTimeMillis();
 
                 if (client.isClosed()) {
                     client = new SendClient(5000);
@@ -146,18 +153,24 @@ public class SendApp {
                 g2d.drawImage(scaled, 0, 0, null);
                 g2d.dispose();
 
-                int[] ints = new int[targetWidth * targetHeight];
-                byte[] frameBytes = new byte[targetWidth * targetHeight * 3];
                 resized.getRGB(0,0,targetWidth,targetHeight, ints, 0, targetWidth);
 
+                if (frameBytes.length != ints.length * 3) {
+                    frameBytes = new byte[ints.length * 3];
+                    //System.out.println("Resized frame buffer to " + frameBytes.length + " bytes");
+                }
                 intsToBytes_RGB(ints, frameBytes);
-                frameBytes = compress_RGB(frameBytes);
+                byte[] compressed = compress_RGB(frameBytes);
 
                 // Send to server
-                client.sendFrame(frameBytes);
+                client.sendFrame(compressed);
 
                 // ~30 FPS
-                Thread.sleep(100);
+                //Thread.sleep(100);
+                end = System.currentTimeMillis();
+                dt = end - start;
+
+                //System.out.println(dt);
             }
         } catch (Exception e) {
             e.printStackTrace();

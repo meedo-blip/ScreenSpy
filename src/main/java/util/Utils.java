@@ -75,6 +75,10 @@ public class Utils {
 		int texID = glGenTextures();
 		glBindTexture(GL_TEXTURE_2D, texID);
 
+		// For smoother scaling:
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
 		// Set texture parameter
 		// Repeat image in both directions
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
@@ -91,6 +95,7 @@ public class Utils {
 				glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height,
 						0, GL_RGBA, GL_UNSIGNED_BYTE, image);
 			} else if (channels == 3) {
+
 				glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height,
 						0, GL_RGB, GL_UNSIGNED_BYTE, image);
 
@@ -98,7 +103,6 @@ public class Utils {
 				if (error != GL_NO_ERROR) {
 					System.out.println("OpenGL Error: " + error);
 				}
-
 			} else {
 				assert false : "Error: (Texture) Unknown number of channels '" + channels + "'";
 			}

@@ -16,7 +16,7 @@ public class StaticBlock extends QuadSprite {
     public StaticBlock(Shader shader, int texture) {
         this.shader = shader;
         this.texId = texture;
-        this.color = new Vector4f(1,1,1,1);
+        this.color = new Vector4f(1,0,0,1);
     }
 
     @Override

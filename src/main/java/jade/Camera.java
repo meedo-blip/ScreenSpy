@@ -8,7 +8,7 @@ public class Camera {
 	private Matrix4f projectionMatrix, viewMatrix;
 	public Vector2f position;
 
-	private final float projection_h = 56f * 40f, projection_w = projection_h * 9f / 16f;
+	private final float projection_h = 1080, projection_w = projection_h * 9f / 16f;
 	
 	public Camera(Vector2f position) {
 		// Set vector position of camera

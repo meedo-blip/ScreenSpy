@@ -39,6 +39,40 @@ public abstract class Sprite {
 
     public abstract void update(float dt);
 
+    public float x() {
+        return transform.position.x;
+    }
+    public float y() {
+        return transform.position.y;
+    }
+    public float width() {
+        return transform.scale.x;
+    }
+    public float height() {
+        return transform.scale.y;
+    }
+
+    public Sprite x(float x) {
+        transform.position.x = x;
+        changed = true;
+        return this;
+    }
+    public Sprite y(float y) {
+        transform.position.y = y;
+        changed = true;
+        return this;
+    }
+    public Sprite width(float width) {
+        transform.scale.x = width;
+        changed = true;
+        return this;
+    }
+    public Sprite height(float height) {
+        transform.scale.y = height;
+        changed = true;
+        return this;
+    }
+
     public Vector4f getColor() {
         return color;
     }

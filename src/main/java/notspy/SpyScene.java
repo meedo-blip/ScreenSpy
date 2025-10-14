@@ -4,14 +4,13 @@ import components.StaticBlock;
 import components.TextNode;
 import jade.Scene;
 import jade.Transform;
-import jade.Window;
 import org.joml.Vector2f;
 import org.joml.Vector4f;
+import org.lwjgl.BufferUtils;
 import util.Utils;
 
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 import static jade.Constants.ARIAL_FONT;
@@ -21,15 +20,33 @@ public class SpyScene extends Scene {
 
     private RecieverServer server;
 
-    private StaticBlock block;
-    private TextNode infoText;
-    private static int blockWidth = 1280;  // scaled resolution
+    private static class Client {
+        public StaticBlock block;
+        public TextNode infoText = null;
+        public int clientId;
+    }
+
+    private static final List<Client> clients = new ArrayList<>();
+
+    private static final int texWidth = 1280;  // scaled resolution
+    private static final int texHeight = texWidth * 9 / 16;
+
+    private static final int gridResWidth = 1280;
+    private static final int gridResHeight = gridResWidth * 9 / 16;
+
+    // sprite width
+    private static int blockWidth = 1920;
     private static int blockHeight = blockWidth * 9 / 16;
 
-    // Thread-safe queue for raw bytes from network
-    private static final ConcurrentLinkedQueue<byte[]> receivedQueue = new ConcurrentLinkedQueue<>();
+    private final ByteBuffer buffer = BufferUtils.createByteBuffer(texWidth * texHeight * 3);
 
-    private int textureId = -1; // reusable texture
+    static class FrameData {
+        public int clientId;
+        public byte[] data;
+    }
+
+    // Thread-safe queue for raw bytes from network
+    private static final ConcurrentLinkedQueue<FrameData> receivedQueue = new ConcurrentLinkedQueue<>();
 
     // Decompress RLE RGBA array
     public static byte[] decompress(byte[] compressed) {
@@ -76,13 +93,88 @@ public class SpyScene extends Scene {
         return result;
     }
 
+    public Client getClient(int clientId) {
+        if(clients.isEmpty()) return null;
+        Client c;
+
+        for (int i = Math.min(clientId, clients.size() - 1); i >= 0; i--) {
+            c = clients.get(i);
+            if(c.clientId == clientId) {
+                return c;
+            }
+        }
+
+        return null;
+    }
+
+    public void updateClients() {
+        int gridSize = (int) Math.ceil(Math.sqrt(clients.size()));
+        if (gridSize < 1) return;
+        blockWidth = gridResWidth / gridSize;
+        blockHeight = gridResHeight / gridSize;
+
+        System.out.println("Grid size: " + gridSize + " block size: " + blockWidth + "x" + blockHeight);
+
+        for (int i = 0; i < clients.size(); i++) {
+            int row = i / gridSize;
+            int col = i % gridSize;
+
+            System.out.println("Row: " + row + " Col: " + col);
+
+            float x = (col * blockWidth) - (gridResWidth / 2f) + (blockWidth / 2f);
+            float y = (row * blockHeight) - (gridResHeight / 2f) + (blockHeight / 2f);
+
+            Client c = clients.get(i);
+            c.block.x(x).y(y).width(blockWidth).height(blockHeight);
+
+            c.infoText.setText("");
+            if (c.infoText != null) {
+                c.infoText.x(x).y( y - ((float) blockHeight / 2) + 100);
+            }
+
+            System.out.println("Client " + c.clientId + " at " + x + ", " + y);
+        }
+    }
+
+
+    public void makeClient(int clientId) {
+        // Check if client already exists
+        Client c = getClient(clientId);
+
+        System.out.println("Making client " + clientId);
+        if(c != null) return;
+
+        c = new Client();
+        c.clientId = clientId;
+
+        // Initialize block
+        c.block = (StaticBlock) new StaticBlock(DEFAULT_SH, new org.joml.Vector4f(1,1,1,1))
+                .setTransform(new Transform(new Vector2f(0,0), -1, new Vector2f(blockWidth, blockHeight)));
+        addSprite(c.block);
+
+        c.infoText = makeText(ARIAL_FONT, server.getRemoteAddress(clientId), 0, 0, 11, new Vector4f(0.5f,0.5f,1,1));
+        clients.add(c);
+
+        updateClients();
+    }
+
+    public void removeClient(int clientId) {
+        Client c = null;
+        for (int i = clientId; i >= 0; i--) {
+            if((c = clients.get(i)).clientId == clientId) {
+                clients.remove(c);
+                break;
+            }
+        }
+        removeSprite(c.block);
+        if (c.infoText != null)
+            removeSprite(c.infoText);
+        updateClients();
+
+    }
+
     @Override
     public void init() {
-        // Initialize block
-        block = (StaticBlock) new StaticBlock(DEFAULT_SH, new org.joml.Vector4f(1,1,1,1))
-                .setTransform(new Transform(new Vector2f(0,0), -1, new Vector2f(blockWidth, blockHeight)));
-        addSpriteObjectToScene(block);
-
 
         try {
             server = new RecieverServer(5000, receivedQueue);
@@ -91,44 +183,51 @@ public class SpyScene extends Scene {
             e.printStackTrace();
         }
 
-
-        infoText = makeText(ARIAL_FONT, "Waiting for connection...", 0, 0, 24, new Vector4f(0.5f,0.5f,1,1));
+        //makeClient(-102020);
     }
 
     @Override
     public void dispose() {
         server.thread.interrupt();
     }
+
     @Override
     public void update(float dt) {
         super.update(dt);
 
         // Consume queued data safely on render thread
-        byte[] data = receivedQueue.poll();
-        receivedQueue.clear();
+        FrameData data;
+        int i = 0;
+        while ((data = receivedQueue.poll()) != null && data.data != null) {
+            //if (i == clients.size()) break;
+            Client c = getClient(data.clientId);
 
-        if(server.isClientConnected()) infoText.setText("");
-        else {
-            infoText.setText("Waiting for connection...");
-            block.texId = -1;
-        }
+            if (c == null) {
+                System.out.println("Client " + clients.getLast().clientId + " not found");
+                continue;
+            }
 
-        if (data == null) {
-            return; // No new frame
-        }
+            data.data = decompress_RGB(data.data);
 
-        data = decompress_RGB(data);
+            //System.out.println("Received frame from " + data.clientId + " len: " + data.data.length);
+            if (data.data.length != texWidth * texHeight * 3)  continue;
 
-        ByteBuffer buffer = ByteBuffer.allocateDirect(data.length);
-        buffer.put(data);
-        buffer.flip();
+            buffer.clear();
+            buffer.put(data.data);
+            buffer.flip();
 
-        if (block.texId == -1) {
-            // Create texture once
-            block.texId = Utils.generateTexture(buffer, blockWidth, blockHeight, 3);
-        } else {
-            // Update existing texture
-            Utils.updateTexture(block.texId, buffer, blockWidth, blockHeight, 3);
+            //System.out.println("data from " + data.clientId + ": " + Arrays.toString(Arrays.copyOf(data.data, 16)) + " len: " + data.data.length);
+
+            //c.infoText.setText("");
+            if (c.block.texId == -1) {
+                // Create texture once
+                c.block.texId = Utils.generateTexture(buffer, texWidth, texHeight, 3);
+            } else {
+                // Update existing texture
+                Utils.updateTexture(c.block.texId, buffer, texWidth, texHeight, 3);
+            }
+
+            i++;
         }
     }
 }

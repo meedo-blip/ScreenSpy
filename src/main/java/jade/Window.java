@@ -26,7 +26,6 @@ import static org.lwjgl.system.MemoryUtil.*;
 import static util.Time.dt;
 
 public class Window {
-
     private String title;
 
     // Location of window in the memory
@@ -81,6 +80,13 @@ public class Window {
 
     public static Scene getScene() {
         return currentScene;
+    }
+
+    public static <T extends Scene> T getScene(Class<T> tClass) {
+        if(currentScene.getClass().isAssignableFrom(tClass)) {
+            return (T) currentScene;
+        }
+        return null;
     }
 
     public static int getWidth() {
@@ -149,14 +155,16 @@ public class Window {
         // Make the OpenGL context current
         glfwMakeContextCurrent(glfwWindow);
 
+        // This line is critical for LWJGL's interoperation with GLFW
+        GL.createCapabilities();
+
         // Enable vsync, this locks your frame rate to the refresh rate of the user's monitor
         glfwSwapInterval(0);
 
         // Make the window visible
         glfwShowWindow(glfwWindow);
 
-        // This line is critical for LWJGL's interoperation with GLFW
-        GL.createCapabilities();
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
         // Initialize audio device
         // Initialize the audio device
@@ -200,7 +208,6 @@ public class Window {
     }
 
 	public void loop() {
-
         ScreenQuad screenQuad = new ScreenQuad();
         float startTime = (float) glfwGetTime();
         float endTime;
@@ -210,32 +217,44 @@ public class Window {
         glClearColor(1f, 1f, 1f, 1.0f);
 
         while (!glfwWindowShouldClose(glfwWindow)) {
-            // Poll events
-            glfwPollEvents();
 
-            //System.out.println("running window");
-
+            // First pass - Render to FBO
             fboRenderer.bind();
-
+            //glEnable(GL_DEPTH_TEST);
             glClear(GL_COLOR_BUFFER_BIT);
-
+            
             currentScene.update(dt);
+            
+            // Check framebuffer status only when debug is needed
+            int status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+            if (status != GL_FRAMEBUFFER_COMPLETE) {
+                System.err.println("ERROR::FRAMEBUFFER:: Framebuffer is not complete! Status: " + status);
+            }
 
-            if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
-                System.err.println("ERROR::FRAMEBUFFER:: Framebuffer is not complete!");
-
+            
             fboRenderer.unbind();
 
+            // Second pass - Render to screen
+            glClear(GL_COLOR_BUFFER_BIT);
             glViewport(0, 0, window_w, window_h);
-
-            ScreenQuad.shader.use();
             glDisable(GL_DEPTH_TEST);
+            
+            // Ensure proper state before rendering
+            glActiveTexture(GL_TEXTURE0);
+            ScreenQuad.shader.use();
             glBindTexture(GL_TEXTURE_2D, fboRenderer.getTexture());
-
+            
             screenQuad.draw();
-
+            
+            // Cleanup
+            glBindTexture(GL_TEXTURE_2D, 0);
+            
             glfwSwapBuffers(glfwWindow);
 
+            glfwPollEvents();
+            currentScene.pollEvents();
+
+            // Time calculations
             endTime = (float) glfwGetTime();
             dt = endTime - startTime;
             startTime = endTime;
@@ -244,8 +263,7 @@ public class Window {
             if(currentScene.fixedDT > dt) {
                 try {
                     Thread.sleep((long) ((currentScene.fixedDT - dt) * 1000));
-                } catch (InterruptedException ignored) {
-                }
+                } catch (InterruptedException ignored) {}
             }
 
             ++ticks;

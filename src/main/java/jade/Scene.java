@@ -10,6 +10,7 @@ import renderer.Renderer;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
 public abstract class Scene {
 
@@ -23,6 +24,7 @@ public abstract class Scene {
     private int spriteId = 0;
     private boolean isRunning = false;
     private int ticks = 0;
+    private final ConcurrentLinkedQueue<Runnable> queue = new ConcurrentLinkedQueue<>();
 
     public Scene() {}
 
@@ -38,7 +40,7 @@ public abstract class Scene {
         isRunning = true;
     }
 
-    public Sprite addSpriteObjectToScene(Sprite spr) {
+    public Sprite addSprite(Sprite spr) {
         spr.id = spriteId++;
         gameSprites.add(spr);
 
@@ -51,9 +53,9 @@ public abstract class Scene {
     }
 
 
-    public Sprite addSpriteObjectToScene(Sprite spr, Sprite parent) {
+    public Sprite addSprite(Sprite spr, Sprite parent) {
         if(parent == null)
-            return addSpriteObjectToScene(spr);
+            return addSprite(spr);
 
         spr.id = spriteId++;
         spr.pForm = parent.transform;
@@ -78,7 +80,7 @@ public abstract class Scene {
         int width = text.length();
         int height = (text.length() / width) + Math.min(1, text.length() - width);
 
-        return (TextNode) addSpriteObjectToScene(new DefaultTextNode(font, text, fontsize, color).setTransform(new Transform(new Vector2f(x,y), -1, new Vector2f(fontsize * width, fontsize * height))), grandParent);
+        return (TextNode) addSprite(new DefaultTextNode(font, text, fontsize, color).setTransform(new Transform(new Vector2f(x,y), -1, new Vector2f(fontsize * width, fontsize * height))), grandParent);
     }
 
     public Sprite getSprite(String name) {
@@ -107,6 +109,16 @@ public abstract class Scene {
         renderer.remove(spr);
     }
 
+    public void pollEvents() {
+        for(int i = 0; i < queue.size(); i++) {
+            queue.remove().run();
+        }
+    }
+
+    public void queueEvent(Runnable r) {
+        queue.add(r);
+    }
+
     public void update(float dt) {
         for(int i = 0; i < gameSprites.size(); i++)
             gameSprites.get(i).update(dt);
@@ -118,6 +130,8 @@ public abstract class Scene {
         }
         ticks++;
     }
+
+
 
     public void dispose() {}
 
@@ -164,7 +178,7 @@ public abstract class Scene {
     private void addSpriteToParent(Sprite spr, Sprite parent) {
         int loc2 = gameParents.indexOf(-parent.id);
         if(!gameSprites.contains(parent)) {
-            gameParents.add(-addSpriteObjectToScene(parent).id);
+            gameParents.add(-addSprite(parent).id);
             loc2 = gameParents.size();
         } else if (loc2 == -1) {
             gameParents.add(-parent.id);
@@ -193,5 +207,4 @@ public abstract class Scene {
             System.out.println("Sprite " + parent.name + " has no children!");
         }
     }
-
 }

@@ -1,7 +1,6 @@
 package notspy;
 
 import jade.Window;
-import util.Time;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -10,6 +9,7 @@ import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.channels.ServerSocketChannel;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -58,12 +58,12 @@ public class RecieverServer {
     private int port;
     private ServerSocketChannel serverSocketChannel;
     private ExecutorService pool = Executors.newCachedThreadPool();
-    private final Set<ClientHandler> clients = ConcurrentHashMap.newKeySet();
+    public final Set<ClientHandler> clients = ConcurrentHashMap.newKeySet();
 
-    private final ConcurrentLinkedQueue<byte[]> receivedQueue;
+    private final ConcurrentLinkedQueue<SpyScene.FrameData> receivedQueue;
     private ServerSocket serverSocket;
 
-    public RecieverServer(int port, ConcurrentLinkedQueue<byte[]> queue) throws IOException {
+    public RecieverServer(int port, ConcurrentLinkedQueue<SpyScene.FrameData> queue) throws IOException {
         this.port = port;
         this.receivedQueue = queue;
     }
@@ -75,16 +75,15 @@ public class RecieverServer {
         System.out.println("Server started on port " + port);
 
         thread = new Thread(() -> {
-            double lastTotalTime = -1;
 
             while (!Window.shouldClose()) {
-                System.out.println("Server total time: " + Time.totalTime);
-                lastTotalTime = Time.totalTime;
                 try {
                     Socket clientSocket = serverSocketChannel.accept().socket();
                     System.out.println("Client connected: " + clientSocket.getRemoteSocketAddress());
-
                     ClientHandler handler = new ClientHandler(clientSocket);
+
+                    Window.getScene().queueEvent(() -> Objects.requireNonNull(Window.getScene(SpyScene.class)).makeClient(handler.id));
+
                     clients.add(handler);
                     pool.submit(handler);
                 } catch (IOException e) {
@@ -102,8 +101,10 @@ public class RecieverServer {
         thread.start();
     }
 
-    public boolean isClientConnected () {
-        return !clients.isEmpty();
+    public boolean isClientConnected (int clientId) {
+        for(ClientHandler client: clients)
+            if (client.id == clientId) return true;
+        return false;
     }
 
     public boolean isRunning () {
@@ -124,9 +125,23 @@ public class RecieverServer {
         }
     }
 
+    public static int getPort(Socket socket) {
+        return socket.getPort();
+    }
 
-        private class ClientHandler implements Runnable {
-        private Socket socket;
+    public String getRemoteAddress(int clientId) {
+        for (ClientHandler client : clients) {
+            if (client.id == clientId) {
+                return client.socket.getRemoteSocketAddress().toString();
+            }
+        }
+        return "Unknown";
+    }
+
+    private class ClientHandler implements Runnable {
+        private static int uuid = 0;
+        private final Socket socket;
+        public final int id;
         private DataInputStream in;
         private DataOutputStream out;
 
@@ -134,6 +149,7 @@ public class RecieverServer {
             this.socket = socket;
             this.in = new DataInputStream(socket.getInputStream());
             this.out = new DataOutputStream(socket.getOutputStream());
+            this.id = uuid++;
         }
 
         @Override
@@ -144,19 +160,26 @@ public class RecieverServer {
                     byte[] data = new byte[size];
                     in.readFully(data);
 
-                    receivedQueue.add(data); // enqueue only
+                    SpyScene.FrameData frameData = new SpyScene.FrameData();
+                    frameData.data = data;
+                    frameData.clientId = id;
+
+                    //System.out.println("Received frame from client " + id + ": " + frameData.data.length + " bytes");
+                    receivedQueue.add(frameData); // enqueue only
                     // Broadcast to all other clients
                     //broadcast(data, this);
                 }
             } catch (IOException e) {
                 System.out.println("Client disconnected: " + socket.getRemoteSocketAddress());
 
-                System.out.println(((ClientHandler)clients.toArray()[0]).socket.getRemoteSocketAddress() + " clients connected");
+                Window.getScene().queueEvent(() -> {
+                    ((SpyScene) Window.getScene()).removeClient(id);
+                });
 
             } finally {
                 clients.remove(this);
                 try { socket.close(); } catch (IOException ignored) {}
-
+                System.out.println("Connection with client " + id + " closed.");
             }
         }
 
@@ -170,6 +193,7 @@ public class RecieverServer {
             }
         }
     }
+
 
     private void broadcast(byte[] data, ClientHandler sender) {
         for (ClientHandler client : clients) {

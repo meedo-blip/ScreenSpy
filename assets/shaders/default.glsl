@@ -3,7 +3,7 @@
 
 layout (location=0) in vec3 aCenter;
 layout (location=1) in vec2 aScale;
-layout (location=2) in vec3 aColor;
+layout (location=2) in vec4 aColor;
 layout (location=3) in vec2 aTexCoords;
 layout (location=4) in float aTexId;
 
@@ -28,7 +28,7 @@ void main() {
                             : vert == 1 ? vec2(-aScale.x, aScale.y)
                             : aScale , 0.0);
 
-    fColor = vec4(aColor,1.0);
+    fColor = aColor;
     fTexCoords = aTexCoords;
     fTexId = aTexId;
 

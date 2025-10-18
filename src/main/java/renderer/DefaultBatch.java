@@ -4,6 +4,8 @@ import components.QuadSprite;
 import jade.Transform;
 import org.joml.Vector4f;
 
+import javax.swing.*;
+
 import static org.lwjgl.opengl.GL11.GL_FLOAT;
 import static org.lwjgl.opengl.GL20.*;
 
@@ -27,6 +29,8 @@ public class DefaultBatch extends QuadBatch {
             TEX_ID_OFFSET = TEX_COORDS_OFFSET + (TEX_COORDS_SIZE * Float.BYTES),
             VERTEX_SIZE = 12,
             VERTEX_SIZE_BYTES = VERTEX_SIZE * Float.BYTES;
+
+    private static final Transform transform = new Transform();
 
     public DefaultBatch(Shader shader) {
         super(shader, 11);
@@ -72,14 +76,22 @@ public class DefaultBatch extends QuadBatch {
         // Find offset within vertices array (4 vertices per sprite)
         int offset = index * 4 * VERTEX_SIZE;
 
-        Transform transform = sprite.transform;
+        Transform form = sprite.transform;
+
+        if(sprite.parent != null) {
+            transform.copy(sprite.transform);
+            transform.position.x += sprite.parent.transform.position.x;
+            transform.position.y += sprite.parent.transform.position.y;
+            form = transform;
+        }
+
         Vector4f color = sprite.getColor();
         float[] uv = sprite.getTexCoords();
         // texID is the tex position in textures
         // 0 means no texture
         float tex_id = textures.indexOf(sprite.getTexId()) + 1;
-        float halfX = transform.scale.x / 2;
-        float halfY = transform.scale.y / 2;
+        float halfX = form.scale.x / 2;
+        float halfY = form.scale.y / 2;
 
         for(int i = 0; i < 4; i++) {
 
@@ -89,9 +101,9 @@ public class DefaultBatch extends QuadBatch {
             // Bottom right  3
 
             // Load position
-            vertices[offset] = transform.position.x;
-            vertices[offset + 1] = transform.position.y;
-            vertices[offset + 2] = transform.z;
+            vertices[offset] = form.position.x;
+            vertices[offset + 1] = form.position.y;
+            vertices[offset + 2] = form.z;
 
             // Load scale
             vertices[offset + 3] = halfX;

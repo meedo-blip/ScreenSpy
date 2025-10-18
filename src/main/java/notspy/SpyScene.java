@@ -2,8 +2,7 @@ package notspy;
 
 import components.StaticBlock;
 import components.TextNode;
-import jade.Scene;
-import jade.Transform;
+import jade.*;
 import org.joml.Vector2f;
 import org.joml.Vector4f;
 import org.lwjgl.BufferUtils;
@@ -15,6 +14,8 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 
 import static jade.Constants.ARIAL_FONT;
 import static jade.Constants.DEFAULT_SH;
+import static org.lwjgl.glfw.GLFW.*;
+import static org.lwjgl.opengl.GL11C.glClearColor;
 
 public class SpyScene extends Scene {
 
@@ -24,6 +25,7 @@ public class SpyScene extends Scene {
         public StaticBlock block;
         public TextNode infoText = null;
         public int clientId;
+        public boolean used = false;
     }
 
     private static final List<Client> clients = new ArrayList<>();
@@ -31,12 +33,15 @@ public class SpyScene extends Scene {
     private static final int texWidth = 1280;  // scaled resolution
     private static final int texHeight = texWidth * 9 / 16;
 
-    private static final int gridResWidth = 1280;
-    private static final int gridResHeight = gridResWidth * 9 / 16;
+    private int gridResWidth;
+    private int gridResHeight;
 
     // sprite width
-    private static int blockWidth = 1920;
-    private static int blockHeight = blockWidth * 9 / 16;
+    private int blockWidth = 1280;
+    private int blockHeight = blockWidth * 9 / 16;
+
+    private TextNode infoText, fpsLabel;
+    private boolean shouldHideText = false;
 
     private final ByteBuffer buffer = BufferUtils.createByteBuffer(texWidth * texHeight * 3);
 
@@ -98,8 +103,7 @@ public class SpyScene extends Scene {
         Client c;
 
         for (int i = Math.min(clientId, clients.size() - 1); i >= 0; i--) {
-            c = clients.get(i);
-            if(c.clientId == clientId) {
+            if((c = clients.get(i)).clientId == clientId) {
                 return c;
             }
         }
@@ -113,6 +117,8 @@ public class SpyScene extends Scene {
         blockWidth = gridResWidth / gridSize;
         blockHeight = gridResHeight / gridSize;
 
+        int padding = 100;
+
         System.out.println("Grid size: " + gridSize + " block size: " + blockWidth + "x" + blockHeight);
 
         for (int i = 0; i < clients.size(); i++) {
@@ -125,17 +131,18 @@ public class SpyScene extends Scene {
             float y = (row * blockHeight) - (gridResHeight / 2f) + (blockHeight / 2f);
 
             Client c = clients.get(i);
-            c.block.x(x).y(y).width(blockWidth).height(blockHeight);
+            c.block.x(x).y(y)
+                    .width(blockWidth - padding)
+                    .height(blockHeight - (float) (padding * 9) / 16);
 
-            c.infoText.setText("");
+            //c.infoText.setText("");
             if (c.infoText != null) {
-                c.infoText.x(x).y( y - ((float) blockHeight / 2) + 100);
+                c.infoText.x(x).y( y - blockHeight / 2 + padding);
             }
 
             System.out.println("Client " + c.clientId + " at " + x + ", " + y);
         }
     }
-
 
     public void makeClient(int clientId) {
         // Check if client already exists
@@ -160,7 +167,7 @@ public class SpyScene extends Scene {
 
     public void removeClient(int clientId) {
         Client c = null;
-        for (int i = clientId; i >= 0; i--) {
+        for (int i = Math.min(clientId, clients.size() - 1); i >= 0; i--) {
             if((c = clients.get(i)).clientId == clientId) {
                 clients.remove(c);
                 break;
@@ -175,6 +182,17 @@ public class SpyScene extends Scene {
 
     @Override
     public void init() {
+        gridResWidth = Window.getWidth() / 256 * 192;
+        gridResHeight = gridResWidth * 9 / 16;
+
+        //makeClient(-102020);
+    }
+
+    @Override
+    public void start() {
+        super.start();
+        infoText = makeText(ARIAL_FONT, "Press F to hide text", 0, (float) -gridResHeight / 2 + 25, 12, new Vector4f(1, 1, 0, 1));
+        fpsLabel = makeText(ARIAL_FONT, "FPS: 0", (float) gridResWidth / 2 - 200, (float) -gridResHeight / 2 + 20, 24, new Vector4f(0, 1, 0, 1));
 
         try {
             server = new RecieverServer(5000, receivedQueue);
@@ -182,8 +200,6 @@ public class SpyScene extends Scene {
         } catch (Exception e) {
             e.printStackTrace();
         }
-
-        //makeClient(-102020);
     }
 
     @Override
@@ -195,18 +211,49 @@ public class SpyScene extends Scene {
     public void update(float dt) {
         super.update(dt);
 
+        glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+
+        if(MouseListener.isDragging()) {
+            camera.position.x += MouseListener.getDx() / Window.getWidth();
+            camera.position.y -= MouseListener.getDy() / Window.getHeight();
+        }
+
+        if(KeyListener.isKeyPressed(GLFW_KEY_R))
+            camera.defaultPos();
+
+        if(KeyListener.isKeyClicked(GLFW_KEY_F))
+            shouldHideText = !shouldHideText;
+
+        infoText.hide(shouldHideText);
+        fpsLabel.hide(shouldHideText);
+
+        if(!shouldHideText && Window.getTicks() % 100 == 0) {
+            fpsLabel.setText(Window.getFPS());
+        }
+
+        if(KeyListener.isKeyPressed(GLFW_KEY_Z)) {
+            System.out.println(MouseListener.getScrollY());
+            camera.setZoom((camera.getZoom() + (MouseListener.getScrollY()) * 0.001f));
+        }
+
+        if(KeyListener.isKeyClicked(GLFW_KEY_Z))
+            camera.defaultZoom();
+
         // Consume queued data safely on render thread
         FrameData data;
         int i = 0;
-        while ((data = receivedQueue.poll()) != null && data.data != null) {
-            //if (i == clients.size()) break;
-            Client c = getClient(data.clientId);
 
-            if (c == null) {
-                System.out.println("Client " + clients.getLast().clientId + " not found");
+        for(Client c : clients) c.used = false;
+
+        Client c;
+        while (i != clients.size()
+                && (data = receivedQueue.poll()) != null
+                && (c = getClient(data.clientId)) != null) {
+
+            if (c.used) {
+                i++;
                 continue;
             }
-
             data.data = decompress_RGB(data.data);
 
             //System.out.println("Received frame from " + data.clientId + " len: " + data.data.length);
@@ -216,18 +263,17 @@ public class SpyScene extends Scene {
             buffer.put(data.data);
             buffer.flip();
 
+            c.used = true;
             //System.out.println("data from " + data.clientId + ": " + Arrays.toString(Arrays.copyOf(data.data, 16)) + " len: " + data.data.length);
+            c.infoText.hide(shouldHideText);
 
-            //c.infoText.setText("");
-            if (c.block.texId == -1) {
+            if (c.block.texId == -1)
                 // Create texture once
                 c.block.texId = Utils.generateTexture(buffer, texWidth, texHeight, 3);
-            } else {
+            else
                 // Update existing texture
                 Utils.updateTexture(c.block.texId, buffer, texWidth, texHeight, 3);
-            }
 
-            i++;
         }
     }
 }

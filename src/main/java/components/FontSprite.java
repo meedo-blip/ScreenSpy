@@ -1,6 +1,8 @@
 package components;
 
 import jade.Constants;
+import jade.Transform;
+import org.joml.Vector2f;
 import org.joml.Vector4f;
 
 public class FontSprite extends QuadSprite {
@@ -12,13 +14,8 @@ public class FontSprite extends QuadSprite {
         this.texCoords = texCoords;
     }
 
-    public void start() {
-        super.start();
-    }
-
     @Override
     public void update(float dt) {
-        transform.position.x = pForm.position.x + offsetForm.position.x;
-        transform.position.y = pForm.position.y + offsetForm.position.y;
+        // FontSprite does not need to update anything per frame
     }
 }

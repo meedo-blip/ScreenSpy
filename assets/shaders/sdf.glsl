@@ -49,13 +49,16 @@ uniform sampler2D uTextures[8];
 out vec4 color;
 
 void main() {
+    if(fColor.a == 0.0) // Fix: Change 0f to 0.0 for proper GLSL syntax
+        discard;
+
     float c = texture(uTextures[int(fTexId)], fTexCoords).g;
 
     if (c>0.5f) {
-        color =  vec4(fColor.xyz, 1);
+        color =  vec4(fColor);
     }
     else if(c <= 0.5f && c > 0.45f)
-        color = vec4(fColor.xyz * 0.5f,1);
+        color = vec4(fColor * 0.5f);
     else
         discard;
 }

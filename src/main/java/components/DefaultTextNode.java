@@ -11,11 +11,5 @@ public class DefaultTextNode extends TextNode {
 
     @Override
     public void update(float dt) {
-        if(parent != null) {
-            if(parent.changed) {
-                transform.position.x = pForm.position.x + offsetForm.position.x;
-                transform.position.y = pForm.position.y + offsetForm.position.y;
-            }
-        }
     }
 }

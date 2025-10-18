@@ -101,6 +101,10 @@ public class Window {
         return window.fboRenderer;
     }
 
+    public static String getFPS() {
+        return String.format("FPS: %.2f", 1.0f / dt);
+    }
+
     public void run(Scene scene) {
         System.out.println("Hello LWJGL"+ Version.getVersion() +"!");
 
@@ -189,25 +193,26 @@ public class Window {
         glfwGetWindowSize(window.glfwWindow, bufferW, bufferH);
         window_w = bufferW.get(0);
         window_h = bufferH.get(0);
-        fboRenderer = new FboRenderer(window_w, window_h);
 
         glfwSetFramebufferSizeCallback(window.glfwWindow, (window, width, height) -> {
-             this.window_w = width;
-             this.window_h = height;
-             getScene().camera().onWindowResize(width, height);
-             glViewport(0, 0, width, height);
+            this.window_w = width;
+            this.window_h = height;
+            getScene().camera().onWindowResize(width, height);
+            glViewport(0, 0, width, height);
 
-             glMatrixMode(GL_PROJECTION);
-             glLoadIdentity();
-             glOrtho(0, width, height, 0, 1f, -1f);
-             glMatrixMode(GL_MODELVIEW);
-             glLoadIdentity();
+            glMatrixMode(GL_PROJECTION);
+            glLoadIdentity();
+            glOrtho(0, width, height, 0, 1f, -1f);
+            glMatrixMode(GL_MODELVIEW);
+            glLoadIdentity();
         });
+
+        fboRenderer = new FboRenderer();
 
         System.out.println("Your Gpu supports upto " + texture_units[0] + " textures per batch.");
     }
 
-	public void loop() {
+    public void loop() {
         ScreenQuad screenQuad = new ScreenQuad();
         float startTime = (float) glfwGetTime();
         float endTime;
@@ -222,33 +227,33 @@ public class Window {
             fboRenderer.bind();
             //glEnable(GL_DEPTH_TEST);
             glClear(GL_COLOR_BUFFER_BIT);
-            
+
             currentScene.update(dt);
-            
+
             // Check framebuffer status only when debug is needed
             int status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
             if (status != GL_FRAMEBUFFER_COMPLETE) {
                 System.err.println("ERROR::FRAMEBUFFER:: Framebuffer is not complete! Status: " + status);
             }
 
-            
+
             fboRenderer.unbind();
 
             // Second pass - Render to screen
             glClear(GL_COLOR_BUFFER_BIT);
             glViewport(0, 0, window_w, window_h);
             glDisable(GL_DEPTH_TEST);
-            
+
             // Ensure proper state before rendering
             glActiveTexture(GL_TEXTURE0);
             ScreenQuad.shader.use();
             glBindTexture(GL_TEXTURE_2D, fboRenderer.getTexture());
-            
+
             screenQuad.draw();
-            
+
             // Cleanup
             glBindTexture(GL_TEXTURE_2D, 0);
-            
+
             glfwSwapBuffers(glfwWindow);
 
             glfwPollEvents();

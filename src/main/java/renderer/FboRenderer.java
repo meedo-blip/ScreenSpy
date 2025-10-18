@@ -1,5 +1,7 @@
 package renderer;
 
+import jade.Window;
+
 import static org.lwjgl.opengl.GL30.*;
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL20.*;
@@ -12,11 +14,11 @@ public class FboRenderer {
     private int fbo;
     private int textureColorBuffer;
     private int rboDepthStencil;
-    private final int width, height;
+    private int width, height;
 
-    public FboRenderer(int width, int height) {
-        this.width = width;
-        this.height = height;
+    public FboRenderer() {
+        width = Window.getWidth();
+        height = Window.getHeight();
         initFBO();
     }
 

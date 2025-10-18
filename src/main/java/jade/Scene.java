@@ -21,7 +21,7 @@ public abstract class Scene {
     protected final List<Sprite> gameSprites = new ArrayList<>();
     protected final List<Integer> gameParents = new ArrayList<>();
 
-    private int spriteId = 0;
+    private int spriteId = 1;
     private boolean isRunning = false;
     private int ticks = 0;
     private final ConcurrentLinkedQueue<Runnable> queue = new ConcurrentLinkedQueue<>();
@@ -58,7 +58,6 @@ public abstract class Scene {
             return addSprite(spr);
 
         spr.id = spriteId++;
-        spr.pForm = parent.transform;
         gameSprites.add(spr);
         addSpriteToParent(spr, parent);
 
@@ -78,7 +77,7 @@ public abstract class Scene {
     public TextNode makeText(MyFont font, String text, float x, float y, int fontsize, Vector4f color, Sprite grandParent) {
 
         int width = text.length();
-        int height = (text.length() / width) + Math.min(1, text.length() - width);
+        int height = 1;
 
         return (TextNode) addSprite(new DefaultTextNode(font, text, fontsize, color).setTransform(new Transform(new Vector2f(x,y), -1, new Vector2f(fontsize * width, fontsize * height))), grandParent);
     }
@@ -94,8 +93,8 @@ public abstract class Scene {
     public void removeSprite(Sprite spr) {
         if(spr == null) return;
         int loc2 = gameParents.indexOf(-spr.id);
-        if (loc2++ != -1) {
-
+        if (loc2 != -1) {
+            loc2++;
             while (!(gameParents.get(loc2) < 0)) {
                 removeSprite(getSpriteById(gameParents.remove(loc2)));
                 if(loc2 == gameParents.size())
@@ -120,14 +119,14 @@ public abstract class Scene {
     }
 
     public void update(float dt) {
-        for(int i = 0; i < gameSprites.size(); i++)
-            gameSprites.get(i).update(dt);
-
-        try {
-            renderer.render();
-        } catch (Exception e) {
-            e.printStackTrace();
+        for(int i = 0; i < gameSprites.size(); i++) {
+            Sprite spr = gameSprites.get(i);
+            spr.update(dt);
         }
+
+
+        renderer.render();
+
         ticks++;
     }
 
@@ -166,12 +165,15 @@ public abstract class Scene {
 
     public Sprite getParentOf(Sprite sprite) {
         int loc = gameParents.indexOf(sprite.id);
-        for (int i = loc - 1; i >= 0; i--) {
-            if(gameParents.get(i) < 0) {
-                // turn back to positive
-                return getSpriteById(-gameParents.get(i));
+        if(loc == -1) return null;
+
+        while(loc >= 0) {
+            loc--;
+            if(gameParents.get(loc) < 0) {
+                return getSpriteById(-gameParents.get(loc));
             }
         }
+
         return null;
     }
 
@@ -187,6 +189,7 @@ public abstract class Scene {
             loc2++;
         }
         gameParents.add(loc2, spr.id);
+        spr.parent = parent;
     }
 
     public void removeChildrenOf(Sprite parent) {
@@ -206,5 +209,23 @@ public abstract class Scene {
         } else {
             System.out.println("Sprite " + parent.name + " has no children!");
         }
+    }
+
+    public List<Sprite> getChildrenOf(Sprite spr) {
+        int loc = gameParents.indexOf(-spr.id);
+        if(loc == -1) return List.of();
+
+        List<Sprite> list = new ArrayList<>(8);
+
+        loc++;
+        while(loc < gameParents.size() && gameParents.get(loc) > 0){
+            Sprite sprite = getSpriteById(gameParents.get(loc));
+            loc++;
+
+            if(sprite == null) { continue;}
+            list.add(getSpriteById(sprite.id));
+        }
+
+        return list;
     }
 }

@@ -23,10 +23,6 @@ public class StaticBlock extends QuadSprite {
     public void start() {
         super.start();
         changed = true;
-        offsetPos = new Vector2f(transform.position);
-
-        transform.position.x = (pForm != null ? pForm.position.x : 0f) + offsetPos.x;
-        transform.position.y = (pForm != null ? pForm.position.y : 0f) + offsetPos.y;
 
 
     }

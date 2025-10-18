@@ -8,8 +8,9 @@ public class Camera {
 	private Matrix4f projectionMatrix, viewMatrix;
 	public Vector2f position;
 
-	private final float projection_h = 1080, projection_w = projection_h * 9f / 16f;
-	
+	private int projection_h = 1080, projection_w = projection_h * 16 / 9;
+	private float zoom = 1;
+
 	public Camera(Vector2f position) {
 		// Set vector position of camera
 		this.position = position;
@@ -27,7 +28,7 @@ public class Camera {
 		
 		// Orthographic projection                                                                          Only render objects within zNear and zFar
 		//                       v left   v set right in proj pixel                                           v zNear  v zFar
-		projectionMatrix.ortho( 0,projection_h, projection_w,0, 0.0f, 100.0f);
+		projectionMatrix.ortho( 0,projection_w, projection_h,0, 0.0f, 100.0f);
 		//                                                              ^ bottom               ^ set top in proj pixels
 	}
 	
@@ -57,6 +58,31 @@ public class Camera {
 
 
 	public void onWindowResize(int width, int height) {
-		
+		//projection_h = height;
+		//projection_w = width;
+		//adjustProjection();
+	}
+
+	public void setZoom(float zoom) {
+		this.zoom = zoom;
+		projection_h = (int) (1080 / zoom);
+		projection_w = projection_h * 16 / 9;
+		adjustProjection();
+	}
+
+	public float getZoom() {
+		return zoom;
+	}
+
+	public void defaultPos() {
+		position.x = -1;
+		position.y = 1;
+	}
+
+	public void defaultZoom() {
+		zoom = 1;
+		projection_h = 1080;
+		projection_w = projection_h * 16 / 9;
+		adjustProjection();
 	}
 }

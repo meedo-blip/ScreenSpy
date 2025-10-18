@@ -77,7 +77,7 @@ public abstract class QuadBatch extends RenderBatch {
     @Override
     public void render() {
 
-        byte presentTextures = 0;
+        //byte presentTextures = 0;
         int idx;
         // Update vertices
         for (int i = 0; i < numSprites; i++) {
@@ -152,7 +152,7 @@ public abstract class QuadBatch extends RenderBatch {
     protected void uploadUniforms() {}
 
     protected boolean hasTextureRoom() {
-        return textures.size() < 7;
+        return textures.size() < 8;
     }
 
     protected boolean hasTexture(int tex) {
